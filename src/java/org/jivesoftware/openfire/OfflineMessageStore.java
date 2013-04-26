@@ -20,20 +20,6 @@
 
 package org.jivesoftware.openfire;
 
-import java.io.StringReader;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
@@ -54,6 +40,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xmpp.packet.JID;
 import org.xmpp.packet.Message;
+
+import java.io.*;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Represents the user's offline message storage. A message store holds messages that were
@@ -109,11 +108,41 @@ public class OfflineMessageStore extends BasicModule implements UserEventListene
     private BlockingQueue<SAXReader> xmlReaders = new LinkedBlockingQueue<SAXReader>(POOL_SIZE);
 
     /**
+     * Output debug messages
+     * @param message
+     */
+    private void logger(String message) {
+        Log.info(message);
+        System.out.println(message);
+    }
+
+    /**
      * Constructs a new offline message store.
      */
     public OfflineMessageStore() {
         super("Offline Message Store");
         sizeCache = CacheFactory.createCache("Offline Message Size");
+    }
+
+    private static String readAll(Reader rd) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int cp;
+        while ((cp = rd.read()) != -1) {
+            sb.append((char) cp);
+        }
+        return sb.toString();
+    }
+
+    public static String readJsonFromUrl(String url) throws IOException {
+        InputStream is = new URL(url).openStream();
+        try {
+          BufferedReader rd = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
+          String jsonText = readAll(rd);
+
+          return jsonText;
+        } finally {
+          is.close();
+        }
     }
 
     /**
@@ -148,11 +177,60 @@ public class OfflineMessageStore extends BasicModule implements UserEventListene
 
         long messageID = SequenceManager.nextID(JiveConstants.OFFLINE);
 
+        Connection con = null;
+        PreparedStatement pstmt = null;
+
+        // Send offline message email
+        ResultSet rs = null;
+        try {
+            logger("*********Start retrieving xml attributes*************");
+            String to = message.getElement().attributeValue("to");
+            logger("*********Start retrieving xml 1************* "+to);
+            String from = message.getElement().attributeValue("from");
+            logger("*********Start retrieving xml 2************* "+from);
+            String vehicleId = message.getElement().attributeValue("subject");
+            logger("*********Start retrieving xml 3************* "+vehicleId);
+            String datetime = message.getElement().attributeValue("datetime");
+            logger("*********Start retrieving xml 4************* "+datetime);
+            String msgBody = message.getElement().attributeValue("body");
+            logger("*********Start retrieving xml 5************* "+msgBody);
+            String toUserId = message.getElement().attributeValue("touserid").trim();
+            logger("*********Start retrieving xml 6************* "+toUserId);
+
+            String formattedFromUser = from.substring(0, from.indexOf("@")).replace("(at)", "@");
+            logger("*********formattedFromUser************* "+formattedFromUser);
+
+            con = DbConnectionManager.getConnection();
+            pstmt = con.prepareStatement(LOAD_OFFLINE);
+            pstmt.setString(1, username);
+            rs = pstmt.executeQuery();
+            boolean isOfflineMsgExisted = false;
+            while (rs.next()) {
+                String messageXML = rs.getString(1);
+                if(messageXML.contains(to) && messageXML.contains(from.substring(0, from.indexOf("@"))) && messageXML.contains("<subject>"+vehicleId+"</subject>"))
+                {
+                    isOfflineMsgExisted = true;
+                    break;
+                }
+            }
+            logger("*********isOfflineMsgExisted*************"+ isOfflineMsgExisted);
+
+            URI uri = new URI("http", "//localhost:8080/ca.rides.web/messenger/sendOfflineMessageEmail.json?vehicleId="+vehicleId+"&toUserId="+toUserId+"&fromUser="+formattedFromUser+"&msgBody="+msgBody+"&dateTime="+datetime, null);
+            readJsonFromUrl(uri.toURL().toString());
+            logger("*********Sent*************");
+
+        }
+
+        catch (Exception e) {
+            Log.error(LocaleUtils.getLocalizedString("admin.error"), e);
+        }
+        finally {
+            DbConnectionManager.closeConnection(pstmt, con);
+        }
+
         // Get the message in XML format.
         String msgXML = message.getElement().asXML();
 
-        Connection con = null;
-        PreparedStatement pstmt = null;
         try {
             con = DbConnectionManager.getConnection();
             pstmt = con.prepareStatement(INSERT_OFFLINE);

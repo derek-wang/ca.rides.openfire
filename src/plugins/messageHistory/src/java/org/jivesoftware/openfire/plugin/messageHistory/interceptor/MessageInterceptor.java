@@ -2,11 +2,9 @@ package org.jivesoftware.openfire.plugin.messageHistory.interceptor;
 
 import flexjson.JSONDeserializer;
 import javapns.Push;
-import javapns.communication.exceptions.CommunicationException;
 import javapns.communication.exceptions.KeystoreException;
 import javapns.notification.PushNotificationPayload;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.dom4j.tree.DefaultElement;
 import org.jivesoftware.openfire.PresenceManager;
@@ -70,12 +68,8 @@ public class MessageInterceptor implements PacketInterceptor {
     }
 
     public void interceptPacket(Packet packet, Session session, boolean incoming, boolean processed) throws PacketRejectedException {
-//        logger("-------------------Packet----------------------- ");
-//        logger("Element  =  " + packet.getElement());
+
         logger("XML = " + packet.toXML());
-
-        //Check if the
-
 
         //IQ request from User for HistoryMessage
         if(packet instanceof IQ && incoming == true && processed == true){
@@ -150,8 +144,6 @@ public class MessageInterceptor implements PacketInterceptor {
                     }
                 }, TWO_SECS);
             }
-//            XMPPServer.getInstance().getPacketRouter().route(message);
-
         }
 
         if (packet instanceof Message) {
@@ -162,7 +154,9 @@ public class MessageInterceptor implements PacketInterceptor {
 
                     String vehicleId = message.getSubject();
                     String to = message.getTo().toString().substring(0,message.getTo().toString().lastIndexOf("@"));
-                    String from = message.getFrom().toString().substring(0,message.getFrom().toString().lastIndexOf("@"));
+                    String from = "";
+                    if(message.getFrom() != null)
+                        from = message.getFrom().toString().substring(0,message.getFrom().toString().lastIndexOf("@"));
 
                     logger("------------------Message Packet-------------------");
 

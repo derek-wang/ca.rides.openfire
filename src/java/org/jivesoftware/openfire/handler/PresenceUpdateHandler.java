@@ -20,22 +20,8 @@
 
 package org.jivesoftware.openfire.handler;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.Lock;
-
-import org.jivesoftware.openfire.ChannelHandler;
-import org.jivesoftware.openfire.OfflineMessage;
-import org.jivesoftware.openfire.OfflineMessageStore;
-import org.jivesoftware.openfire.PacketDeliverer;
-import org.jivesoftware.openfire.PacketException;
-import org.jivesoftware.openfire.PresenceManager;
-import org.jivesoftware.openfire.RoutingTable;
-import org.jivesoftware.openfire.SessionManager;
-import org.jivesoftware.openfire.XMPPServer;
+import org.dom4j.DocumentHelper;
+import org.jivesoftware.openfire.*;
 import org.jivesoftware.openfire.auth.UnauthorizedException;
 import org.jivesoftware.openfire.cluster.ClusterEventListener;
 import org.jivesoftware.openfire.cluster.ClusterManager;
@@ -53,11 +39,12 @@ import org.jivesoftware.util.cache.Cache;
 import org.jivesoftware.util.cache.CacheFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xmpp.packet.JID;
-import org.xmpp.packet.Message;
-import org.xmpp.packet.Packet;
-import org.xmpp.packet.PacketError;
-import org.xmpp.packet.Presence;
+import org.xmpp.packet.*;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
 
 /**
  * Implements the presence protocol. Clients use this protocol to
@@ -257,9 +244,68 @@ public class PresenceUpdateHandler extends BasicModule implements ChannelHandler
             if (session.canFloodOfflineMessages()) {
                 // deliver offline messages if any
                 Collection<OfflineMessage> messages = messageStore.getMessages(username, true);
+                Message offlineMessage = new Message();
+                String threadId = "";
+
+                List<String> bodyTags = new ArrayList<String>();
+                List<String> fromUserTags = new ArrayList<String>();
+                List<String> toUserTags = new ArrayList<String>();
+                List<String> creationDateTags = new ArrayList<String>();
+                List<String> toUserIdTags = new ArrayList<String>();
+                List<String> subjectTags = new ArrayList<String>();
+
                 for (Message message : messages) {
-                    session.process(message);
+                    String fromUser = message.getElement().attributeValue("from");
+                    String formattedFromUser = fromUser.substring(0, fromUser.indexOf("/"));
+                    String toUser = message.getElement().attributeValue("to");
+                    String datetime = message.getElement().attributeValue("datetime");
+                    String toUserId = message.getElement().attributeValue("touserid").trim();
+                    threadId = "1";
+                    bodyTags.add(message.getBody());
+                    fromUserTags.add(formattedFromUser);
+                    toUserTags.add(toUser);
+                    creationDateTags.add(datetime);
+                    toUserIdTags.add(toUserId);
+                    subjectTags.add(message.getSubject());
                 }
+
+
+
+                offlineMessage.setType(Message.Type.normal);
+
+                org.dom4j.Element offlineMsgTag = DocumentHelper.createElement("offlineMessage");
+                offlineMsgTag.setText("true");
+                offlineMessage.addExtension(new PacketExtension(offlineMsgTag));
+
+                offlineMessage.setThread(threadId);
+
+
+                for(int i = 0; i < bodyTags.size(); i++)
+                {
+                    org.dom4j.Element entryTag = DocumentHelper.createElement("entry");
+                    org.dom4j.Element bodyTag = DocumentHelper.createElement("body");
+                    bodyTag.setText(bodyTags.get(i));
+                    org.dom4j.Element fromUserTag = DocumentHelper.createElement("fromUser");
+                    fromUserTag.setText(fromUserTags.get(i));
+                    org.dom4j.Element toUsersTag = DocumentHelper.createElement("toUsers");
+                    toUsersTag.setText(toUserTags.get(i));
+                    org.dom4j.Element creationDatesTag = DocumentHelper.createElement("creationDates");
+                    creationDatesTag.setText(creationDateTags.get(i));
+                    org.dom4j.Element toUserIdTag = DocumentHelper.createElement("toUserId");
+                    toUserIdTag.setText(toUserIdTags.get(i));
+                    org.dom4j.Element subjectTag = DocumentHelper.createElement("subject");
+                    subjectTag.setText(subjectTags.get(i));
+                    entryTag.add(bodyTag);
+                    entryTag.add(fromUserTag);
+                    entryTag.add(toUsersTag);
+                    entryTag.add(creationDatesTag);
+                    entryTag.add(toUserIdTag);
+                    entryTag.add(subjectTag);
+
+                    offlineMessage.addExtension(new PacketExtension(entryTag));
+                }
+
+                session.process(offlineMessage);
             }
         }
     }
