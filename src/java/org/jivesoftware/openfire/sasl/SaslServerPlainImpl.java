@@ -21,18 +21,24 @@
 package org.jivesoftware.openfire.sasl;
 
 
-import java.util.Map;
-import java.util.StringTokenizer;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslServer;
-import javax.security.sasl.SaslException;
-import javax.security.sasl.AuthorizeCallback;
+import sun.misc.BASE64Decoder;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESKeySpec;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 /**
  * Implements the PLAIN server-side mechanism.
@@ -115,6 +121,25 @@ public class SaslServerPlainImpl implements SaslServer {
                     principal = username;
                 }
                 password = tokens.nextToken();
+
+                // DECODE encryptedPwd String start
+                if(!password.equalsIgnoreCase("xmpp"))
+                {
+                    DESKeySpec keySpec = new DESKeySpec("the is my little yiyi 98 baidu hen NB 2010".getBytes("UTF8"));
+                    SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
+                    SecretKey key = keyFactory.generateSecret(keySpec);
+                    BASE64Decoder base64decoder = new BASE64Decoder();
+                    byte[] encryptedPwdBytes = base64decoder.decodeBuffer(password);
+
+                    Cipher cipher = Cipher.getInstance("DES");// cipher is not thread safe
+                    cipher.init(Cipher.DECRYPT_MODE, key);
+                    byte[] plainTextPwdBytes = (cipher.doFinal(encryptedPwdBytes));
+
+                    password = new String(plainTextPwdBytes, "UTF-8");
+
+                }
+                // DECODE encryptedPwd String end
+
                 NameCallback ncb = new NameCallback("PLAIN authentication ID: ",principal);
                 VerifyPasswordCallback vpcb = new VerifyPasswordCallback(password.toCharArray());
                 cbh.handle(new Callback[]{ncb,vpcb});
@@ -150,6 +175,8 @@ public class SaslServerPlainImpl implements SaslServer {
         } catch (IOException e) {
             aborted = true;
             throw new SaslException("PLAIN authentication failed for: "+username, e);
+        } catch (Exception e) {
+
         }
         return null;
     }
