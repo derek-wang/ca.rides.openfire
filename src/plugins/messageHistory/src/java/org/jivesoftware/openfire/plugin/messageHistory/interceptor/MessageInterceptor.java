@@ -178,9 +178,6 @@ public class MessageInterceptor implements PacketInterceptor {
                         os.write(data.getBytes());
                         os.flush();
 
-                        String line;
-                        StringBuilder results = new StringBuilder();
-
                         if (conn.getResponseCode() != HttpURLConnection.HTTP_CREATED) {
                             throw new RuntimeException("Failed : HTTP error code : "
                                     + conn.getResponseCode());
@@ -258,19 +255,10 @@ public class MessageInterceptor implements PacketInterceptor {
                     logger("Request URL = " + stringBuilder.toString());
                     logger("Response = " + getMethod.getResponseBodyAsString());
 
-
-
                     //Once execute we try to deserialize the obj
                     ArrayList<HashMap<String, String>> apnsEntities = new JSONDeserializer<ArrayList<HashMap<String, String>>>()
                             .deserialize(getMethod.getResponseBodyAsString());
 
-//                    {"aps":
-//                        {"alert": "Instant Message request from Pete Robinson",
-//                                "instantMessage":{"name":"Pete Robinson",
-//                                "id":501673,"jid":"dealer8(at)rides.ca@rides.openfire"}},
-//                        "device_info": [ "devidcetype":"iPhone 4s",devidtoketn:"D71AFBAA2F1B3B75D9891258CEE45C12A33E74131B52CE4825EB5949A73D9740"]}
-
-                    //"d71afbaa2f1b3b75d9891258cee45c12a33e74131b52ce4825eb5949a73d9740"
                     if(apnsEntities.size() != 0){
                         //At this point, we are sure that the user has iOS devices
                         //Try to get their display name
@@ -285,23 +273,24 @@ public class MessageInterceptor implements PacketInterceptor {
                         imRequestBuilder.append(dealerDisplayName);
 
                         for(int i = 0 ; i < apnsEntities.size(); i++){
+                            String pushReading = apnsEntities.get(i).get("pushReading");
+                            if(pushReading.equalsIgnoreCase("DISABLED")) {
+                                //Custom payload
+                                PushNotificationPayload pushNotificationPayload = PushNotificationPayload.complex();
+                                pushNotificationPayload.addAlert(imRequestBuilder.toString());
 
-                            //Custom payload
-                            PushNotificationPayload pushNotificationPayload = PushNotificationPayload.complex();
-                            pushNotificationPayload.addAlert(imRequestBuilder.toString());
+                                Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
+                                instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
+                                instantMsgUserInfoMap.put("jid", fromUserForOpenfireUsage);
+                                instantMsgUserInfoMap.put("name", dealerDisplayName);
 
-                            Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
-                            instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
-                            instantMsgUserInfoMap.put("jid", fromUserForOpenfireUsage);
-                            instantMsgUserInfoMap.put("name", dealerDisplayName);
+                                List<Map<String, String>> instantMsgUserInfo = new ArrayList<Map<String, String>>();
+                                instantMsgUserInfo.add(instantMsgUserInfoMap);
+                               
+                                pushNotificationPayload.addCustomDictionary("instantMessage", instantMsgUserInfo);
 
-                            List<Map<String, String>> instantMsgUserInfo = new ArrayList<Map<String, String>>();
-                            instantMsgUserInfo.add(instantMsgUserInfoMap);
-                            List<Map<String, String>> userDeviceInfo = new ArrayList<Map<String, String>>();
-
-                            pushNotificationPayload.addCustomDictionary("instantMessage", instantMsgUserInfo);
-
-                            Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+                                Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+                            }
                         }
                     }
 
