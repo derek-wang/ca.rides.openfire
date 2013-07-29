@@ -215,7 +215,7 @@ public class OfflineMessageStore extends BasicModule implements UserEventListene
             }
             logger("*********isOfflineMsgExisted*************"+ isOfflineMsgExisted);
 
-            URI uri = new URI("http", "//localhost:8080/ca.rides.web/messenger/sendOfflineMessageEmail.json?vehicleId="+vehicleId+"&toUserId="+toUserId+"&fromUser="+formattedFromUser+"&msgBody="+msgBody+"&dateTime="+datetime, null);
+            URI uri = new URI("https", "//beta.rides.ca/messenger/sendOfflineMessageEmail.json?vehicleId="+vehicleId+"&toUserId="+toUserId+"&fromUser="+formattedFromUser+"&msgBody="+msgBody+"&dateTime="+datetime, null);
             readJsonFromUrl(uri.toURL().toString());
             logger("*********Sent*************");
 

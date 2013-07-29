@@ -55,12 +55,15 @@ public class MessageInterceptor implements PacketInterceptor {
 
     //For push notification
     final static String DEV_P12_LOC = "/opt/openfire/plugins/rides_prod_push.p12";
-    final static String LOC_P12_LOC = "C:\\Users\\HeavyArms\\Desktop\\WORK\\Bignition_Projects\\Rides\\ca.rides.messenger.openfire\\src\\plugins\\messageHistory\\resources\\rides_prod_push.p12";
-    private String DEV_URL_FOR_DEVICE_INFO = "http://localhost:8080/ca.rides.web/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
-    private String LOC_URL_FOR_DEVICE_INFO = "http://localhost:8080/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
-    private String DEV_URL_FOR_USER_DISPLAY_INFO = "http://localhost:8080/ca.rides.web/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
-    private String LOC_URL_FOR_USER_DISPLAY_INFO = "http://localhost:8080/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
+
+    private String DEV_URL_FOR_DEVICE_INFO = "https://beta.rides.ca/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
+
+    private String DEV_URL_FOR_USER_DISPLAY_INFO = "https://beta.rides.ca/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
+    
+    private String IM_LEAD_URL = "https://beta.rides.ca/bidLead/makeLead";
+    
     final private HttpClient httpClient = new HttpClient();
+    
     private GetMethod getMethod;
 
 
@@ -69,121 +72,117 @@ public class MessageInterceptor implements PacketInterceptor {
 
     public void interceptPacket(Packet packet, Session session, boolean incoming, boolean processed) throws PacketRejectedException {
 
-        logger("XML = " + packet.toXML());
+        //logger("XML = " + packet.toXML());
 
         //IQ request from User for HistoryMessage
-        if(packet instanceof IQ && incoming == true && processed == true){
+        if(processed) {
+            if(packet instanceof IQ && incoming == true){
 
-            final IQ iq = (IQ) packet;
+                final IQ iq = (IQ) packet;
 
-            if(iq.getID() != null && iq.getID().contains(MESSAGE_STATUS)){
-                logger("*********ToSetMessageStatus*************");
-            }
+                if(iq.getID() != null && iq.getID().contains(MESSAGE_STATUS)){
+                    /*logger("*********ToSetMessageStatus*************");*/
+                }
 
-            //Need to check here if the IQ packet ID is null
-            if(iq.getID() != null && iq.getID().contains(HISTORY_MESSAGE)){
-                final String fromJID = iq.getFrom().toBareJID();
-                final DefaultElement targetElement = (DefaultElement)iq.getElement().content().get(1);
-                final DefaultElement targetiOSElement = (DefaultElement)iq.getElement().content().get(2);
-                final String targetJID = targetElement.getText();
+                //Need to check here if the IQ packet ID is null
+                if(iq.getID() != null && iq.getID().contains(HISTORY_MESSAGE)){
+                    final String fromJID = iq.getFrom().toBareJID();
+                    final DefaultElement targetElement = (DefaultElement)iq.getElement().content().get(1);
+                    final DefaultElement targetiOSElement = (DefaultElement)iq.getElement().content().get(2);
+                    final String targetJID = targetElement.getText();
 
-                logger("*********RequestForHistoryMessage*************");
-                logger("Request for the target JID = " + targetJID);
-                logger("Request for the from JID = " + iq.getFrom().toBareJID());
-                logger("Full JID = " + iq.getFrom().toFullJID());
-                logger("Bare JID = " + iq.getFrom().toBareJID());
-                logger("From JID = " + fromJID);
-                logger("Target JID = " + targetJID);
-                logger("Target iOS Element = " + targetiOSElement.getText());
+                   /* logger("*********RequestForHistoryMessage*************");
+                    logger("Request for the target JID = " + targetJID);
+                    logger("Request for the from JID = " + iq.getFrom().toBareJID());
+                    logger("Full JID = " + iq.getFrom().toFullJID());
+                    logger("Bare JID = " + iq.getFrom().toBareJID());
+                    logger("From JID = " + fromJID);
+                    logger("Target JID = " + targetJID);
+                    logger("Target iOS Element = " + targetiOSElement.getText());*/
 
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
 
-                        //From should be the target of query
-                        //To should be the requester
-                        DefaultElement subjectElement = null;
-                        String subject = null;
-                        DefaultElement windowIdElement = null;
-                        String windowId = null;
-                        try{
-                            if(iq.getID().contains(HISTORY_MESSAGE_iOS)){
-                                subjectElement = (DefaultElement)iq.getElement().content().get(3);
-                            }else{
-                                subjectElement = (DefaultElement)iq.getElement().content().get(2);
+                            //From should be the target of query
+                            //To should be the requester
+                            DefaultElement subjectElement = null;
+                            String subject = null;
+                            DefaultElement windowIdElement = null;
+                            String windowId = null;
+                            try{
+                                if(iq.getID().contains(HISTORY_MESSAGE_iOS)){
+                                    subjectElement = (DefaultElement)iq.getElement().content().get(3);
+                                }else{
+                                    subjectElement = (DefaultElement)iq.getElement().content().get(2);
+                                }
+
+                                subject = subjectElement.getText();
+                                if(iq.getElement().content().size() > 2)
+                                {
+                                    windowIdElement = (DefaultElement)iq.getElement().content().get(3);
+                                    windowId = windowIdElement.getText();
+                                }
+                                else
+                                {
+                                    windowId = "0";
+                                }
+                            }catch (Exception e){
+                                logger.error("Not able to retrieve subject line of IQ packet");
                             }
 
-                            subject = subjectElement.getText();
-                            if(iq.getElement().content().size() > 2)
-                            {
-                                windowIdElement = (DefaultElement)iq.getElement().content().get(3);
-                                windowId = windowIdElement.getText();
+                            if(subject != null && iq.getID().contains(HISTORY_MESSAGE_iOS)){
+                                //For iOS specifically
+                                this.userHistoryMessageDispatcher(DbUtil.retriveMessageOnSubjectForiOS(targetiOSElement.getText(), targetJID, subject));
+                                logger("^^^^^^^^^^^^^^^^^^ retrieve history message for iOS got called ^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                            }else if(subject != null && iq.getID().contains(HISTORY_MESSAGE)){
+                                //For Web, has WindowID
+                                this.userHistoryMessageDispatcher(DbUtil.retrieveMessageOnSubject(targetJID, fromJID, subject, windowId));
+                                logger("^^^^^^^^^^^^^^^^^^ retrieve history message for Web got called ^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                             }
-                            else
-                            {
-                                windowId = "0";
-                            }
-                        }catch (Exception e){
-                            logger.error("Not able to retrieve subject line of IQ packet");
                         }
 
-                        if(subject != null && iq.getID().contains(HISTORY_MESSAGE_iOS)){
-                            //For iOS specifically
-                            this.userHistoryMessageDispatcher(DbUtil.retriveMessageOnSubjectForiOS(targetiOSElement.getText(), targetJID, subject));
-                            logger("^^^^^^^^^^^^^^^^^^ retrieve history message for iOS got called ^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-                        }else if(subject != null && iq.getID().contains(HISTORY_MESSAGE)){
-                            //For Web, has WindowID
-                            this.userHistoryMessageDispatcher(DbUtil.retrieveMessageOnSubject(targetJID, fromJID, subject, windowId));
-                            logger("^^^^^^^^^^^^^^^^^^ retrieve history message for Web got called ^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                        private void userHistoryMessageDispatcher(Message historyMessage){
+                                    logger("HistoryMessage = " + historyMessage.toXML());
+                                    SessionManager.getInstance().sendServerMessage(historyMessage, new JID(fromJID));
                         }
-                    }
-
-                    private void userHistoryMessageDispatcher(Message historyMessage){
-                                logger("HistoryMessage = " + historyMessage.toXML());
-                                SessionManager.getInstance().sendServerMessage(historyMessage, new JID(fromJID));
-                    }
-                }, TWO_SECS);
+                    }, TWO_SECS);
+                }
             }
-        }
 
-        if (packet instanceof Message) {
-            Message message = (Message) packet;
-                logger("message type = " + message.getType());
+            if (packet instanceof Message) {
+                Message message = (Message) packet;
+               
                 if(!message.getType().equals(Message.Type.normal))
                 {
-
                     String vehicleId = message.getSubject();
                     String to = message.getTo().toString().substring(0,message.getTo().toString().lastIndexOf("@"));
                     String from = "";
-                    if(message.getFrom() != null)
+                    if(message.getFrom() != null) {
                         from = message.getFrom().toString().substring(0,message.getFrom().toString().lastIndexOf("@"));
-
-                    logger("------------------Message Packet-------------------");
-
-                    logger("message packet = " + message.toXML());
-
+                    }
 
                     //Ken's bidLead
                     try
                     {
-                        URL url = new URL("http://localhost:8080/ca.rides.web/bidLead/makeLead");
+                        URL url = new URL(IM_LEAD_URL);
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setDoOutput(true);
                         conn.setRequestMethod("POST");
                         conn.setRequestProperty("Content-Type", "text/plain");
 
                         String data = vehicleId+","+to+","+from+","+message.getBody();
-                        logger("Posting "+data+"to: http://localhost:8080/ca.rides.web/bidLead/makeLead");
+
                         OutputStream os = conn.getOutputStream();
                         os.write(data.getBytes());
                         os.flush();
 
-                        if (conn.getResponseCode() != HttpURLConnection.HTTP_CREATED) {
+                        if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
                             throw new RuntimeException("Failed : HTTP error code : "
                                     + conn.getResponseCode());
                         }
 
-                        BufferedReader br = new BufferedReader(new InputStreamReader(
+                        /*BufferedReader br = new BufferedReader(new InputStreamReader(
                                 (conn.getInputStream())));
 
                         String output;
@@ -191,6 +190,7 @@ public class MessageInterceptor implements PacketInterceptor {
                         while ((output = br.readLine()) != null) {
                             logger(output);
                         }
+                        */
                         conn.disconnect();
                     }
 
@@ -198,8 +198,8 @@ public class MessageInterceptor implements PacketInterceptor {
                         logger(e.getMessage());
                     }
 
-                    //only store when incoming and processed are TRUE
-                    if (incoming == true && processed == true ) {
+                    //only store when incoming
+                    if (incoming == true) {
 
                         //Make sure it's not for History message
                         String subject = null;
@@ -244,86 +244,78 @@ public class MessageInterceptor implements PacketInterceptor {
                         getMethod = new GetMethod(stringBuilder.append(userToPushForOpenfireUsage).toString());
 
                        //The actual push
-                try {
-                    java.io.InputStream inputStream = new FileInputStream(DEV_P12_LOC);
+                        try {
+                            java.io.InputStream inputStream = new FileInputStream(DEV_P12_LOC);
 
-                    KeyStore keyStore = java.security.KeyStore.getInstance("PKCS12");
-                    char password[] = "1234".toCharArray();
-                    keyStore.load(inputStream, password);
+                            KeyStore keyStore = java.security.KeyStore.getInstance("PKCS12");
+                            char password[] = "1234".toCharArray();
+                            keyStore.load(inputStream, password);
 
-                    httpClient.executeMethod(getMethod);
-                    logger("Request URL = " + stringBuilder.toString());
-                    logger("Response = " + getMethod.getResponseBodyAsString());
+                            httpClient.executeMethod(getMethod);
+                            logger("Request URL = " + stringBuilder.toString());
+                            logger("Response = " + getMethod.getResponseBodyAsString());
 
-                    //Once execute we try to deserialize the obj
-                    ArrayList<HashMap<String, String>> apnsEntities = new JSONDeserializer<ArrayList<HashMap<String, String>>>()
-                            .deserialize(getMethod.getResponseBodyAsString());
+                            //Once execute we try to deserialize the obj
+                            ArrayList<HashMap<String, String>> apnsEntities = new JSONDeserializer<ArrayList<HashMap<String, String>>>()
+                                    .deserialize(getMethod.getResponseBodyAsString());
 
-                    if(apnsEntities.size() != 0){
-                        //At this point, we are sure that the user has iOS devices
-                        //Try to get their display name
-                        StringBuilder imRequestBuilder = new StringBuilder("Instant Message Request from ");
-                        stringBuilder = new StringBuilder(DEV_URL_FOR_USER_DISPLAY_INFO);
-                        getMethod = new GetMethod(stringBuilder.append(fromUserForOpenfireUsage).toString());
-                        httpClient.executeMethod(getMethod);
-                        logger("Request URL trying to get Dealer Display = " + stringBuilder.toString());
-                        logger("Response = " + getMethod.getResponseBodyAsString());
+                            if(apnsEntities.size() != 0){
+                                //At this point, we are sure that the user has iOS devices
+                                //Try to get their display name
+                                StringBuilder imRequestBuilder = new StringBuilder("Instant Message Request from ");
+                                stringBuilder = new StringBuilder(DEV_URL_FOR_USER_DISPLAY_INFO);
+                                getMethod = new GetMethod(stringBuilder.append(fromUserForOpenfireUsage).toString());
+                                httpClient.executeMethod(getMethod);
+                                logger("Request URL trying to get Dealer Display = " + stringBuilder.toString());
+                                logger("Response = " + getMethod.getResponseBodyAsString());
 
-                        String dealerDisplayName = getMethod.getResponseBodyAsString();
-                        imRequestBuilder.append(dealerDisplayName);
+                                String dealerDisplayName = getMethod.getResponseBodyAsString();
+                                imRequestBuilder.append(dealerDisplayName);
 
-                        for(int i = 0 ; i < apnsEntities.size(); i++){
-                            String pushReading = apnsEntities.get(i).get("pushReading");
-                            if(pushReading.equalsIgnoreCase("DISABLED")) {
-                                //Custom payload
-                                PushNotificationPayload pushNotificationPayload = PushNotificationPayload.complex();
-                                pushNotificationPayload.addAlert(imRequestBuilder.toString());
+                                for(int i = 0 ; i < apnsEntities.size(); i++){
+                                    String pushReading = apnsEntities.get(i).get("pushReading");
+                                    if(pushReading.equalsIgnoreCase("DISABLED")) {
+                                        //Custom payload
+                                        PushNotificationPayload pushNotificationPayload = PushNotificationPayload.complex();
+                                        pushNotificationPayload.addAlert(imRequestBuilder.toString());
 
-                                Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
-                                instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
-                                instantMsgUserInfoMap.put("jid", fromUserForOpenfireUsage);
-                                instantMsgUserInfoMap.put("name", dealerDisplayName);
+                                        Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
+                                        instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
+                                        instantMsgUserInfoMap.put("jid", fromUserForOpenfireUsage);
+                                        instantMsgUserInfoMap.put("name", dealerDisplayName);
 
-                                List<Map<String, String>> instantMsgUserInfo = new ArrayList<Map<String, String>>();
-                                instantMsgUserInfo.add(instantMsgUserInfoMap);
-                               
-                                pushNotificationPayload.addCustomDictionary("instantMessage", instantMsgUserInfo);
+                                        List<Map<String, String>> instantMsgUserInfo = new ArrayList<Map<String, String>>();
+                                        instantMsgUserInfo.add(instantMsgUserInfoMap);
 
-                                Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+                                        pushNotificationPayload.addCustomDictionary("instantMessage", instantMsgUserInfo);
+
+                                        Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+                                    }
+                                }
                             }
+
+                        } catch (FileNotFoundException e) {
+                            logger("Having issue Getting the P12 location");
+                        } catch (CertificateException e) {
+                            logger("cant find the certificate");
+                        } catch (NoSuchAlgorithmException e) {
+                            logger("cant find the algorithm");
+                        } catch (KeyStoreException e) {
+                            logger("Can't find the KeyStore");
+                        } catch (IOException e) {
+                            logger("Something is wrong with the IO");
+                        } catch (KeystoreException e) {
+                            logger("Something is wrong with the Keystore in javaPNS");
+                        } catch (JSONException e) {
+                            logger("Something is wrong with the JSON prep");
+                        }  catch (javapns.communication.exceptions.CommunicationException e) {
+                            logger("Something is wrong with the communication");
                         }
                     }
-
-                } catch (FileNotFoundException e) {
-                    logger("Having issue Getting the P12 location");
-                } catch (CertificateException e) {
-                    logger("cant find the certificate");
-                } catch (NoSuchAlgorithmException e) {
-                    logger("cant find the algorithm");
-                } catch (KeyStoreException e) {
-                    logger("Can't find the KeyStore");
-                } catch (IOException e) {
-                    logger("Something is wrong with the IO");
-                } catch (KeystoreException e) {
-                    logger("Something is wrong with the Keystore in javaPNS");
-                } catch (JSONException e) {
-                    logger("Something is wrong with the JSON prep");
-                }  catch (javapns.communication.exceptions.CommunicationException e) {
-                    logger("Something is wrong with the communication");
-                }
-
-
-
-                logger("Thread : " + message.getThread());
-                logger("XML format : " + message.toXML());
-                logger("------------------END of Message Packet-------------------");
                 }
             }
-        logger("------------------PACKET-HIT-------------------");
         }
     }
-
-
 
     /**
      * class logger
@@ -334,5 +326,4 @@ public class MessageInterceptor implements PacketInterceptor {
         logger.info(message);
         System.out.println(message);
     }
-
 }
