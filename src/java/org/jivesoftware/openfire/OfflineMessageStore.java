@@ -194,10 +194,10 @@ public class OfflineMessageStore extends BasicModule implements UserEventListene
             logger("*********Start retrieving xml 4************* "+datetime);
             String msgBody = message.getElement().attributeValue("body");
             logger("*********Start retrieving xml 5************* "+msgBody);
-            String toUserId = message.getElement().attributeValue("touserid").trim();
+            String toUserId = message.getElement().attributeValue("touserid") != null ? message.getElement().attributeValue("touserid").trim() : null;
             logger("*********Start retrieving xml 6************* "+toUserId);
 
-            String formattedFromUser = from.substring(0, from.indexOf("@")).replace("(at)", "@");
+            String formattedFromUser = from.indexOf("@") != -1 ? from.substring(0, from.indexOf("@")).replace("(at)", "@") : null;
             logger("*********formattedFromUser************* "+formattedFromUser);
 
             con = DbConnectionManager.getConnection();
@@ -207,15 +207,17 @@ public class OfflineMessageStore extends BasicModule implements UserEventListene
             boolean isOfflineMsgExisted = false;
             while (rs.next()) {
                 String messageXML = rs.getString(1);
-                if(messageXML.contains(to) && messageXML.contains(from.substring(0, from.indexOf("@"))) && messageXML.contains("<subject>"+vehicleId+"</subject>"))
+                if(messageXML.contains(to) && messageXML.contains("<subject>"+vehicleId+"</subject>"))
                 {
-                    isOfflineMsgExisted = true;
-                    break;
+                    if(from.indexOf("@") != -1 && messageXML.contains(from.substring(0, from.indexOf("@")))) {
+                        isOfflineMsgExisted = true;
+                        break;
+                    }
                 }
             }
             logger("*********isOfflineMsgExisted*************"+ isOfflineMsgExisted);
 
-            URI uri = new URI("https", "//beta.rides.ca/messenger/sendOfflineMessageEmail.json?vehicleId="+vehicleId+"&toUserId="+toUserId+"&fromUser="+formattedFromUser+"&msgBody="+msgBody+"&dateTime="+datetime, null);
+            URI uri = new URI("https", "//ws.rides.ca/messenger/sendOfflineMessageEmail.json?vehicleId="+vehicleId+"&toUserId="+toUserId+"&fromUser="+formattedFromUser+"&msgBody="+msgBody+"&dateTime="+datetime, null);
             readJsonFromUrl(uri.toURL().toString());
             logger("*********Sent*************");
 

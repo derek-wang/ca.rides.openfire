@@ -4,6 +4,8 @@ import flexjson.JSONDeserializer;
 import javapns.Push;
 import javapns.communication.exceptions.KeystoreException;
 import javapns.notification.PushNotificationPayload;
+import javapns.notification.PushedNotification;
+import javapns.notification.PushedNotifications;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.dom4j.tree.DefaultElement;
@@ -25,7 +27,10 @@ import org.xmpp.packet.JID;
 import org.xmpp.packet.Message;
 import org.xmpp.packet.Packet;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.KeyStore;
@@ -56,11 +61,11 @@ public class MessageInterceptor implements PacketInterceptor {
     //For push notification
     final static String DEV_P12_LOC = "/opt/openfire/plugins/rides_prod_push.p12";
 
-    private String DEV_URL_FOR_DEVICE_INFO = "https://beta.rides.ca/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
+    private String DEV_URL_FOR_DEVICE_INFO = "https://ws.rides.ca/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
 
-    private String DEV_URL_FOR_USER_DISPLAY_INFO = "https://beta.rides.ca/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
+    private String DEV_URL_FOR_USER_DISPLAY_INFO = "https://ws.rides.ca/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
     
-    private String IM_LEAD_URL = "https://beta.rides.ca/bidLead/makeLead";
+    private String IM_LEAD_URL = "https://ws.rides.ca/bidLead/makeLead";
     
     final private HttpClient httpClient = new HttpClient();
     
@@ -72,7 +77,7 @@ public class MessageInterceptor implements PacketInterceptor {
 
     public void interceptPacket(Packet packet, Session session, boolean incoming, boolean processed) throws PacketRejectedException {
 
-        //logger("XML = " + packet.toXML());
+        logger("XML = " + packet.toXML());
 
         //IQ request from User for HistoryMessage
         if(processed) {
@@ -90,15 +95,6 @@ public class MessageInterceptor implements PacketInterceptor {
                     final DefaultElement targetElement = (DefaultElement)iq.getElement().content().get(1);
                     final DefaultElement targetiOSElement = (DefaultElement)iq.getElement().content().get(2);
                     final String targetJID = targetElement.getText();
-
-                   /* logger("*********RequestForHistoryMessage*************");
-                    logger("Request for the target JID = " + targetJID);
-                    logger("Request for the from JID = " + iq.getFrom().toBareJID());
-                    logger("Full JID = " + iq.getFrom().toFullJID());
-                    logger("Bare JID = " + iq.getFrom().toBareJID());
-                    logger("From JID = " + fromJID);
-                    logger("Target JID = " + targetJID);
-                    logger("Target iOS Element = " + targetiOSElement.getText());*/
 
                     timer.schedule(new TimerTask() {
                         @Override
@@ -143,8 +139,7 @@ public class MessageInterceptor implements PacketInterceptor {
                         }
 
                         private void userHistoryMessageDispatcher(Message historyMessage){
-                                    logger("HistoryMessage = " + historyMessage.toXML());
-                                    SessionManager.getInstance().sendServerMessage(historyMessage, new JID(fromJID));
+                            SessionManager.getInstance().sendServerMessage(historyMessage, new JID(fromJID));
                         }
                     }, TWO_SECS);
                 }
@@ -289,7 +284,13 @@ public class MessageInterceptor implements PacketInterceptor {
 
                                         pushNotificationPayload.addCustomDictionary("instantMessage", instantMsgUserInfo);
 
-                                        Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+                                        PushedNotifications pushedNotifications = Push.payload(pushNotificationPayload, keyStore, "1234", true, apnsEntities.get(i).get("devicetoken"));
+
+                                        List<PushedNotification> successfulNotifications = PushedNotification.findSuccessfulNotifications(pushedNotifications);
+                                        logger("successfulNotifications = " + successfulNotifications);
+
+                                        List<PushedNotification> failedNotifications = PushedNotification.findFailedNotifications(pushedNotifications);
+                                        logger("failedNotifications = " + failedNotifications);
                                     }
                                 }
                             }

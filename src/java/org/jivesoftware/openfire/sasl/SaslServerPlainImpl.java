@@ -21,12 +21,6 @@
 package org.jivesoftware.openfire.sasl;
 
 
-import sun.misc.BASE64Decoder;
-
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.DESKeySpec;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -122,23 +116,22 @@ public class SaslServerPlainImpl implements SaslServer {
                 }
                 password = tokens.nextToken();
 
-                // DECODE encryptedPwd String start
+                /*// DECODE encryptedPwd String start
                 if(!password.equalsIgnoreCase("xmpp"))
                 {
-                    DESKeySpec keySpec = new DESKeySpec("the is my little yiyi 98 baidu hen NB 2010".getBytes("UTF8"));
-                    SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
-                    SecretKey key = keyFactory.generateSecret(keySpec);
-                    BASE64Decoder base64decoder = new BASE64Decoder();
-                    byte[] encryptedPwdBytes = base64decoder.decodeBuffer(password);
+                    SecretKeySpec skeySpec = new SecretKeySpec("9z1EuqdsFy4NcU7".getBytes(), "Blowfish");
+                    Cipher cipher = Cipher.getInstance("Blowfish");
 
-                    Cipher cipher = Cipher.getInstance("DES");// cipher is not thread safe
-                    cipher.init(Cipher.DECRYPT_MODE, key);
-                    byte[] plainTextPwdBytes = (cipher.doFinal(encryptedPwdBytes));
+                    BASE64Decoder bASE64Decoder = new BASE64Decoder();
+                    byte decrytByt[] = bASE64Decoder.decodeBuffer(password);
 
-                    password = new String(plainTextPwdBytes, "UTF-8");
+                    cipher.init(Cipher.DECRYPT_MODE, skeySpec);
 
+                    byte decrypted[] = cipher.doFinal(decrytByt);
+
+                    password = new String(decrypted).trim();
                 }
-                // DECODE encryptedPwd String end
+                // DECODE encryptedPwd String end*/
 
                 NameCallback ncb = new NameCallback("PLAIN authentication ID: ",principal);
                 VerifyPasswordCallback vpcb = new VerifyPasswordCallback(password.toCharArray());

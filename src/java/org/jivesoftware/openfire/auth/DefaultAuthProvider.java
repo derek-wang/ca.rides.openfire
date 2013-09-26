@@ -20,18 +20,17 @@
 
 package org.jivesoftware.openfire.auth;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
-
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.jivesoftware.database.DbConnectionManager;
 import org.jivesoftware.openfire.XMPPServer;
 import org.jivesoftware.openfire.user.UserNotFoundException;
 import org.jivesoftware.util.JiveGlobals;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.UnsupportedEncodingException;
+import java.sql.*;
 
 /**
  * Default AuthProvider implementation. It authenticates against the <tt>ofUser</tt>
@@ -50,7 +49,7 @@ public class DefaultAuthProvider implements AuthProvider {
             "SELECT plainPassword,encryptedPassword FROM ofUser WHERE username=?";
     private static final String UPDATE_PASSWORD =
             "UPDATE ofUser SET plainPassword=?, encryptedPassword=? WHERE username=?";
-
+    private static final byte[] SALT = {117, 100, (byte) 196, 88, (byte) 215, 80, 39, 29, 11, 29, 61, 113, (byte) 230, (byte) 251, (byte) 199, 17};
     /**
      * Constructs a new DefaultAuthProvider.
      */
@@ -75,11 +74,20 @@ public class DefaultAuthProvider implements AuthProvider {
             }
         }
         try {
-            if (!password.equals(getPassword(username))) {
-                throw new UnauthorizedException();
+            if(username.equalsIgnoreCase("admin") || password.equalsIgnoreCase("xmpp")) {
+                if (!password.equals(getPassword(username))) {
+                    throw new UnauthorizedException();
+                }
+            } else {
+                if (!password.equals(DigestUtils.sha256Hex(ArrayUtils.addAll(SALT, getPassword(username).getBytes("UTF-8"))))) {
+                    throw new UnauthorizedException();
+                }
             }
         }
         catch (UserNotFoundException unfe) {
+            throw new UnauthorizedException();
+        }
+        catch (UnsupportedEncodingException une) {
             throw new UnauthorizedException();
         }
         // Got this far, so the user must be authorized.
