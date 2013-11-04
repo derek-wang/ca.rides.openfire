@@ -32,7 +32,7 @@ public class DbUtil {
     protected static final String INSERT = "INSERT INTO ofmessagehistory (fromUser, toUser, subject,threadID, creationDate, messageBody, messageStatus, isOffline) VALUES (?, ?, ?, ? ,? , ?, ?, ?)";
     protected static final String SELECT_7_DAY_HISTORY = "SELECT * FROM ofmessagehistory WHERE (((fromUser=?) AND (toUser=?)) OR ((fromUser=?) AND (toUser=?))) AND (current_timestamp - interval '7 days') <= creationDate ORDER BY creationDate ASC";
     protected static final String SELECT_SUBJECT_HISTORY = "SELECT * FROM ofmessagehistory WHERE (((fromUser=?) AND (toUser=?)) OR ((fromUser=?) AND (toUser=?))) AND (subject=?) ORDER BY creationDate ASC";
-    protected static final String SELECT_SUBJECT_HISTORY_iOS = "SELECT * FROM ofmessagehistory WHERE (((fromUser=?) AND (toUser=?)) OR ((fromUser=?) AND (toUser=?))) AND (subject=?) ORDER BY creationDate ASC";
+    protected static final String SELECT_SUBJECT_HISTORY_iOS = "SELECT * FROM ofmessagehistory WHERE (((LOWER(fromUser)=?) AND (LOWER(toUser)=?)) OR ((LOWER(fromUser)=?) AND (LOWER(toUser)=?))) AND (subject=?) ORDER BY creationDate ASC";
     protected static final String UPDATE_MESSAGE_STATUS = "UPDATE ofmessagehistory SET messagestatus = ? WHERE fromuser = ? AND touser = ? AND subject = ? AND creationdate = ? and messagebody = ?";
 
 
@@ -171,7 +171,7 @@ public class DbUtil {
     }
 
     public static Message retriveMessageOnSubjectForiOS(String userName, String targetName, String subject){
-// retrieve the histories from db
+        // retrieve the histories from db
         Message historyMessage = new Message();
         String threadId = "";
 
@@ -181,17 +181,17 @@ public class DbUtil {
         List<String> creationDateTags = new ArrayList<String>();
         List<String> subjectTags = new ArrayList<String>();
 
-         PreparedStatement statement = null;
+        PreparedStatement statement = null;
         ResultSet result = null;
         try
         {
             connection = DbConnectionManager.getConnection();
 
             statement = connection.prepareStatement(SELECT_SUBJECT_HISTORY_iOS, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
-            statement.setString(1, targetName);
-            statement.setString(2, userName);
-            statement.setString(3, userName);
-            statement.setString(4, targetName);
+            statement.setString(1, targetName.toLowerCase());
+            statement.setString(2, userName.toLowerCase());
+            statement.setString(3, userName.toLowerCase());
+            statement.setString(4, targetName.toLowerCase());
             statement.setString(5, subject);
             result = statement.executeQuery();
 
