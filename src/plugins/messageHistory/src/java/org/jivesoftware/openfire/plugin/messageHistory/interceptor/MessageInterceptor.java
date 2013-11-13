@@ -61,9 +61,9 @@ public class MessageInterceptor implements PacketInterceptor {
     //For push notification
     final static String DEV_P12_LOC = "/opt/openfire/plugins/rides_prod_push.p12";
     // for production https://ws.rides.ca/mobile
-    private String DEV_URL_FOR_DEVICE_INFO = "https://ws.rides.ca/mobile/webservice/ios/getDeviceInfoOnEmail?userEmail=";
+    private String DEV_URL_FOR_DEVICE_INFO = "https://ws.rides.ca/mobile/webservice/ios/getDeviceInfoOnId?id=";
 
-    private String DEV_URL_FOR_USER_DISPLAY_INFO = "https://ws.rides.ca/mobile/webservice/ios/getUserDisplayOnEmail?userEmail=";
+    private String DEV_URL_FOR_USER_DISPLAY_INFO = "https://ws.rides.ca/mobile/webservice/ios/getUserDisplayOnOpenfireAccount?of=";
     
     private String IM_LEAD_URL = "https://ws.rides.ca/bidLead/makeLead";
     
@@ -177,15 +177,6 @@ public class MessageInterceptor implements PacketInterceptor {
                                     + conn.getResponseCode());
                         }
 
-                        /*BufferedReader br = new BufferedReader(new InputStreamReader(
-                                (conn.getInputStream())));
-
-                        String output;
-                        logger("Output from Server .... \n");
-                        while ((output = br.readLine()) != null) {
-                            logger(output);
-                        }
-                        */
                         conn.disconnect();
                     }
 
@@ -229,16 +220,16 @@ public class MessageInterceptor implements PacketInterceptor {
                         String userToPushForOpenfireUsage = userToPushWithRidesFormat;
                         userToPushForOpenfireUsage = userToPushForOpenfireUsage.substring(0, userToPushForOpenfireUsage.indexOf("@"));
                         userToPushForOpenfireUsage = userToPushForOpenfireUsage.replace("(at)", "@");
-                        String toUserRidesId = message.getElement().attributeValue("touserid") != null ? message.getElement().attributeValue("touserid").trim() : null;
+                        String userIdToPushFor = message.getElement().attributeValue("touserid") != null ? message.getElement().attributeValue("touserid").trim() : null;
 
                         //From User
                         String fromUserWithRidesFormat = message.getFrom().toString();
-                        String fromUserForOpenfireUsage = fromUserWithRidesFormat;
-                        fromUserForOpenfireUsage = fromUserForOpenfireUsage.substring(0, fromUserForOpenfireUsage.indexOf("@"));
-                        fromUserForOpenfireUsage = fromUserForOpenfireUsage.replace("(at)", "@");
+                        String fromUserForOpenfireUsage = fromUserWithRidesFormat.substring(0, fromUserWithRidesFormat.indexOf("/"));
+                        String jid = fromUserWithRidesFormat.substring(0, fromUserWithRidesFormat.indexOf("@")).replace("(at)", "@");
+
                         StringBuilder stringBuilder = new StringBuilder(DEV_URL_FOR_DEVICE_INFO);
 
-                        getMethod = new GetMethod(stringBuilder.append(userToPushForOpenfireUsage).toString());
+                        getMethod = new GetMethod(stringBuilder.append(userIdToPushFor).toString());
 
                        //The actual push
                         try {
@@ -278,8 +269,8 @@ public class MessageInterceptor implements PacketInterceptor {
 
                                         Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
                                         instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
-                                        instantMsgUserInfoMap.put("ridesId", toUserRidesId);
-                                        instantMsgUserInfoMap.put("name", dealerDisplayName != null ? dealerDisplayName.substring(0, 5) + "..." : dealerDisplayName);
+                                        instantMsgUserInfoMap.put("jid", jid);
+                                        instantMsgUserInfoMap.put("name", dealerDisplayName);
 
                                         List<Map<String, String>> instantMsgUserInfo = new ArrayList<Map<String, String>>();
                                         instantMsgUserInfo.add(instantMsgUserInfoMap);
