@@ -51,6 +51,7 @@ public class MessageInterceptor implements PacketInterceptor {
     final private static String HISTORY_MESSAGE = "HistoryMessage";
     final private static String HISTORY_MESSAGE_iOS = "HistoryMessageiOS";
     final private static String MESSAGE_STATUS = "MessageStatus";
+    final private static String NOTIFICATION_SOUND = "notification.wav";
     final private static int TWO_SECS = 1;
     Timer timer = new Timer();
 
@@ -266,6 +267,7 @@ public class MessageInterceptor implements PacketInterceptor {
                                         //Custom payload
                                         PushNotificationPayload pushNotificationPayload = PushNotificationPayload.complex();
                                         pushNotificationPayload.addAlert(imRequestBuilder.toString());
+                                        pushNotificationPayload.addSound(NOTIFICATION_SOUND);
 
                                         Map<String, String> instantMsgUserInfoMap = new HashMap<String, String>();
                                         instantMsgUserInfoMap.put("vehicleId", vehicleSubjectId);
